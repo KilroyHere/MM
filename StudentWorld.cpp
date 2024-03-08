@@ -279,3 +279,28 @@ bool StudentWorld::isObstructed(double x, double y)
 	}
 	return false;
 }
+
+bool StudentWorld::isPathObstructed(double startX, double startY, double endX, double endY)
+{
+	if (startX == endX)
+	{
+		double x = startX;
+		for (double y = startY; y <= endY; y++)
+		{
+			if (isObstructed(x, y))
+				return true;
+		}
+		return false;
+	}
+	else if (startY == endY)
+	{
+		double y = startY;
+		for (double x = startX; x <= endX; x++)
+		{
+			if (isObstructed(x, y))
+			return true;
+		}
+		return false;
+	}
+	return true;
+}

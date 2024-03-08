@@ -19,6 +19,7 @@ public:
 
 	bool isWithinBounds(double x, double y);
 	bool isObstructed(double x, double y);
+	bool isPathObstructed(double startX, double startY, double endX, double endY);
 	bool isActorAt(double x, double y);
 	std::vector <std::shared_ptr<Actor>> getActorsAt(double x, double y);
 	std::shared_ptr<Player> getPlayer();

@@ -294,18 +294,65 @@ void Character::getHit(int points)
 		kill();
 	}
 }
+
+bool Character::shouldShoot()
+{
+	int direction = getDirection();
+	double X = getX();
+	double Y = getY();
+
+	StudentWorld* sw = getStudentWorld();
+	shared_ptr<Player> player = sw->getPlayer();
+	double playerX = player->getX();
+	double playerY = player->getY();
+	
+
+	bool playerInLine = false;
+	bool obstructionExists = false;
+	// Same Columns
+	if (X == playerX)
+	{
+		if (direction == up && playerY > Y)
+		{
+			playerInLine = true;
+			obstructionExists = sw->isPathObstructed(X, Y+1, playerX, playerY-1);
+		}
+		else if (direction == down && playerY < Y)
+		{
+			playerInLine = true;
+			obstructionExists = sw->isPathObstructed(playerX, playerY+1, X, Y-1);
+		}
+	}
+	// Same Row
+	else if (Y == playerY)
+	{
+		if (direction == right && playerX > X)
+		{
+			playerInLine = true;
+			obstructionExists = sw->isPathObstructed(X+1, Y, playerX-1, playerY);
+		}
+		else if (direction == left && playerX < X)
+		{
+			playerInLine = true;
+			obstructionExists = sw->isPathObstructed(playerX+1, playerY, X-1, Y);
+		}
+	}
+
+	return (playerInLine && !obstructionExists);
+}
 		
 
-void Character::move(int direction)
+bool Character::move(int direction)
 {
 	pair<double, double> updatedPos = newPos(getX(), getY(), direction);
 	StudentWorld* sw = getStudentWorld();
 	if (!sw->isWithinBounds(updatedPos.first, updatedPos.second)) {
-		return; // Early exit if the new position is out of bounds
+		return false; // Early exit if the new position is out of bounds
 	}
 	if (!sw->isObstructed(updatedPos.first, updatedPos.second))
 	{
 		moveTo(updatedPos.first, updatedPos.second);
+		return true;
 	}
 	else if(isPlayer())
 	{
@@ -321,16 +368,19 @@ void Character::move(int direction)
 					if (marble->push(direction))
 					{
 						moveTo(updatedPos.first, updatedPos.second);
+						return true;
 					}
 				}
 				else if (exit)
 				{
 					moveTo(updatedPos.first, updatedPos.second);
+					return true;
 				}
 			}
 		}
 
 	}
+	return false;
 	
 }
 
@@ -384,10 +434,9 @@ RageBot::RageBot(StudentWorld* sw, double x, double y, int startDirection)
 	}
 	}
 	//Setting Rest Time
-	int ticks = (28 - sw->getLevel()) / 4; // levelNumber is the current
-	// level number (0, 1, 2, etc.)
+	int ticks = (28 - sw->getLevel()) / 4; 
 	if (ticks < 3)
-		ticks = 3; // no RageBot moves more frequently than this
+		ticks = 3; 
 	cout << ticks << endl;
 	m_maxRestTime = ticks;
 	m_restTime = ticks;
@@ -395,7 +444,28 @@ RageBot::RageBot(StudentWorld* sw, double x, double y, int startDirection)
 
 void RageBot::doSomething()
 {
+	int direction = getDirection();
+	if (m_restTime > 0)
+	{
+		m_restTime--;
+		return;
+	}
+	else
+	{
+		m_restTime = m_maxRestTime;
+		if (shouldShoot())
+		{
+			shoot(direction);
+		}
+		else
+		{
+			if (!move(direction))
+			{
+				setDirection(direction + 180);
+			}
+		}
 
+	}
 }
 
 Player::Player(StudentWorld* sw, double x, double y)

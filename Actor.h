@@ -20,7 +20,6 @@ public:
 	virtual bool isMovable() { return false;  }
 	virtual bool isPushable() { return false; }
 	virtual bool isKillable() { return false; }
-	virtual bool canAttack() { return false; }
 	virtual int holdsPoints() { return 0; }
 	virtual bool isExit() { return false; }
 
@@ -55,8 +54,8 @@ public:
 
 class Pit : public Actor {
 public:
-    Pit(StudentWorld* sw, double x, double y);
-	virtual bool blocksMovement() { return true; }
+    Pit(StudentWorld* sw, double x, double y); 
+	virtual bool blocksMovement() { return true; } //ODO: Will cause issues for Peas passing (Implement isPit() maybe?)
 	virtual void doSomething();
 };
 
@@ -90,22 +89,22 @@ public:
 	virtual bool blocksMovement() { return true; }
 	virtual bool isMovable() { return true; }
 	virtual bool isKillable() { return true; }
-	virtual bool canAttack() { return true; }
-	virtual int holdsPoints() { return m_valuePoints; }
 	virtual bool isPlayer() { return false; }
 	virtual int getPeas() { return 0; }
+	virtual int holdsPoints() { return m_valuePoints; }
 
 	virtual void reducePeas() { return; }
 	virtual void incrPeas(int peas) { return; }
 
 	int getHitPoints();
 	void getHit(int points);
+	bool shouldShoot();
 	
 private:
 	int m_valuePoints;
 protected:
 	int m_hitPoints;
-	void move(int direction);
+	bool move(int direction);
 	void shoot(int direction);
 };
 
@@ -146,7 +145,6 @@ public:
 	virtual void getPicked(std::shared_ptr<Player> player) { return; }
 	//virtual void getPicked(std::shared_ptr<ThiefBot> thiefbot) { return; }
 	virtual void doSomething();
-
 
 private:
 	int m_valuePoints;
