@@ -7,9 +7,9 @@
 # o***o o***o #
 # or2ao o*2ao #
 # ooooo ooooo #
-#      b     v#
-#             #
+#   a   b a  v#
+#  a    a   a #
 #    b    b   #
-#####     #####
+#####    a ####
 #*hao  1  oah*#
 ###############

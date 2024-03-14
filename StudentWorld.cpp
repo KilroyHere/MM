@@ -110,6 +110,16 @@ void StudentWorld::addActor(Level::MazeEntry actor, double x, double y)
 		m_actors.push_back(make_shared<RageBot>(this, x, y, GraphObject::right));
 		break;
 	}
+	case Level::thiefbot_factory:
+	{
+		m_actors.push_back(make_shared<ThiefBotFactory>(this, x, y, ThiefBotFactory::factorytype::regular));
+		break;
+	}
+	case Level::mean_thiefbot_factory:
+	{
+		m_actors.push_back(make_shared<ThiefBotFactory>(this, x, y, ThiefBotFactory::factorytype::mean));
+		break;
+	}
 	default:
 	{
 		break;
@@ -125,13 +135,32 @@ void StudentWorld::exposeExit()
 		if (actor->isExit())
 		{
 			actor->setVisible(true);
-		}	
+		}
 	}
 }
 
-void StudentWorld::addPea(double x, double y, int direction)
+void StudentWorld::addThiefBot(std::shared_ptr<ThiefBot> thiefbot)
 {
-	m_actors.push_back(make_shared<Pea>(this, x, y, direction));
+	m_actorsQueue.push_back(thiefbot);
+}
+
+void StudentWorld::addPea(shared_ptr<Pea> pea)
+{
+	m_actorsQueue.push_back(pea);
+}
+
+void StudentWorld::addGoodie(std::shared_ptr<Goodie> goodie)
+{
+	m_actorsQueue.push_back(goodie);
+}
+
+void StudentWorld::moveQueue()
+{
+	for (auto actor : m_actorsQueue)
+	{
+		m_actors.push_back(actor);
+	}
+	m_actorsQueue.clear();
 }
 
 void StudentWorld::reduceCrystal()
@@ -170,8 +199,6 @@ vector<shared_ptr<Actor>> StudentWorld::getActorsAt(double x, double y)
 			result.push_back(actor);
 		}
 	}
-	if(result.empty())
-		cerr << "Cannot find Actors at "<<x<<","<<y<< endl;
 	return result;
 }
 
@@ -193,8 +220,9 @@ int StudentWorld::getBonus()
 
 int StudentWorld::move()
 {
+	// TODO: here actors like pea and thiefbots and goodies maybe added or removed during doSomething of other actors. need to call doSomething for the added ones without breaking the loop
 	updateDisplaytext();
-	for (auto& actor : m_actors)
+	for (auto actor : m_actors)
 	{
 		if (actor->isAlive())
 		{
@@ -211,10 +239,11 @@ int StudentWorld::move()
 			}
 		}
 	}
+	moveQueue();
 	reduceLevelBonusByOne();
 	removeDeadGameObjects();
 
-	
+
 	return GWSTATUS_CONTINUE_GAME;
 }
 
@@ -288,7 +317,14 @@ bool StudentWorld::isPathObstructed(double startX, double startY, double endX, d
 		for (double y = startY; y <= endY; y++)
 		{
 			if (isObstructed(x, y))
-				return true;
+			{
+				vector<shared_ptr<Actor>> actors = getActorsAt(x, y);
+				for (auto actor : actors)
+				{
+					if (!actor->isSurfaceLeveled())
+						return true;
+				}
+			}
 		}
 		return false;
 	}
@@ -298,9 +334,18 @@ bool StudentWorld::isPathObstructed(double startX, double startY, double endX, d
 		for (double x = startX; x <= endX; x++)
 		{
 			if (isObstructed(x, y))
-			return true;
+			{
+				vector<shared_ptr<Actor>> actors = getActorsAt(x, y);
+				for (auto actor : actors)
+				{
+					if (!actor->isSurfaceLeveled())
+						return true;
+				}
+			}
 		}
 		return false;
 	}
 	return true;
 }
+
+

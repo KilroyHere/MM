@@ -26,12 +26,16 @@ public:
 	int getCrystalsLeft();
 	int getBonus();
 
-	void addPea(double x, double y, int direction);
+	void addThiefBot(std::shared_ptr<ThiefBot> thiefbot);
+	void addPea(std::shared_ptr<Pea> pea);
+	void addGoodie(std::shared_ptr<Goodie> goodie);
+	void moveQueue();
 	void reduceCrystal();
 	void setLevelComplete();
 
 private:
 	std::vector<std::shared_ptr<Actor>> m_actors;
+	std::vector<std::shared_ptr<Actor>> m_actorsQueue;
 	int m_crystals;
 	int m_bonus;
 	std::shared_ptr<Player> m_player;

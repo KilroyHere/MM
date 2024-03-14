@@ -1,0 +1,9 @@
+# Ignore Debug directory
+Debug/
+
+# Ignore files with certain extensions
+*.user
+*.o
+*.obj
+*.vcxproj
+

@@ -9,9 +9,10 @@ Actor::Actor(StudentWorld* sw, int imageID, double startX, double startY, int st
 
 }
 
-void Actor::remove()
+void Actor::remove(bool givePoints)
 {
-	getStudentWorld()->increaseScore(holdsPoints());
+	if(givePoints)
+		getStudentWorld()->increaseScore(holdsPoints());
 	m_alive = false;
 }
 void Actor::kill()
@@ -22,6 +23,12 @@ void Actor::kill()
 bool Actor::isAlive()
 {
 	return m_alive;
+}
+void Actor::revive(double x, double y)
+{
+	moveTo(x, y);
+	setVisible(true);
+	m_alive = true;
 }
 StudentWorld* Actor::getStudentWorld()
 {
@@ -93,8 +100,8 @@ void Pit::doSomething()
 			{
 				if (actor->isPushable())
 				{
-					remove();
-					actor->remove();
+					remove(false);
+					actor->remove(false);
 				}
 			}
 		}
@@ -112,7 +119,7 @@ void Marble::getHit(int points)
 {
 	m_hitPoints = m_hitPoints - points;
 	if (m_hitPoints <= 0)
-		remove();
+		remove(false);
 }
 
 bool Marble::push(int direction)
@@ -133,8 +140,7 @@ bool Marble::push(int direction)
 		vector<shared_ptr<Actor>> actors = sw->getActorsAt(updatedMarblePos.first, updatedMarblePos.second);
 		for (auto actor : actors)
 		{
-			shared_ptr<Pit> pit = dynamic_pointer_cast<Pit>(actor);
-			if (pit)
+			if (actor->isSurfaceLeveled() && !actor->isExit())
 			{
 				moveTo(updatedMarblePos.first, updatedMarblePos.second);
 				return true;
@@ -142,7 +148,7 @@ bool Marble::push(int direction)
 		}
 		return false;
 	}
-	
+
 }
 
 Pea::Pea(StudentWorld* sw, double x, double y, int direction)
@@ -160,19 +166,19 @@ void Pea::doSomething()
 	StudentWorld* sw = getStudentWorld();
 	double x = getX();
 	double  y = getY();
+	bool hit = false;
 	//Checks if current position is Obstructed
 	if (!sw->isWithinBounds(x, y))
 		return;
-	if (!sw->isObstructed(x, y)) //isObstructed only loooks for Items that can Obstruct
-	{
-		pair<double, double> updatedPos = newPos(x, y, getDirection());
-		moveTo(updatedPos.first, updatedPos.second);
-	}
-	else
+	if (sw->isObstructed(x, y)) //isObstructed only loooks for Items that can Obstruct
 	{
 		vector<shared_ptr<Actor>> actors = sw->getActorsAt(x, y);
 		for (auto actor : actors)
 		{
+			if (actor->isSurfaceLeveled())
+			{
+				break;
+			}
 			if (actor->isKillable())
 			{
 				shared_ptr<Character> character = dynamic_pointer_cast<Character>(actor);
@@ -186,10 +192,19 @@ void Pea::doSomething()
 					marble->getHit(2);
 				}
 			}
-			remove();
+			hit = true;
 			break;
 		}
-		
+	}
+	if (hit)
+	{
+		remove(false);
+
+	}
+	else
+	{
+		pair<double, double> updatedPos = newPos(x, y, getDirection());
+		moveTo(updatedPos.first, updatedPos.second);
 	}
 }
 
@@ -213,6 +228,12 @@ void Goodie::doSomething()
 	}
 }
 
+void Goodie::getStolen()
+{
+	setVisible(false);
+	remove(false);
+}
+
 RestoreHealth::RestoreHealth(StudentWorld* sw, double x, double y)
 	:Goodie(sw, IID_RESTORE_HEALTH, x, y, 500)
 {
@@ -223,7 +244,7 @@ void RestoreHealth::getPicked(std::shared_ptr<Player> player)
 {
 	StudentWorld* sw = getStudentWorld();
 	player->restoreHealth();
-	remove();
+	remove(true);
 	sw->playSound(SOUND_GOT_GOODIE);
 }
 
@@ -237,7 +258,7 @@ void ExtraLife::getPicked(std::shared_ptr<Player> player)
 {
 	StudentWorld* sw = getStudentWorld();
 	sw->incLives();
-	remove();
+	remove(true);
 	sw->playSound(SOUND_GOT_GOODIE);
 }
 
@@ -251,7 +272,7 @@ void Ammo::getPicked(shared_ptr<Player> player)
 {
 	StudentWorld* sw = getStudentWorld();
 	player->incrPeas(20);
-	remove();
+	remove(true);
 	sw->playSound(SOUND_GOT_GOODIE);
 }
 
@@ -265,7 +286,7 @@ void Crystal::getPicked(shared_ptr<Player> player)
 {
 	StudentWorld* sw = getStudentWorld();
 	sw->reduceCrystal();
-	remove();
+	remove(true);
 	sw->playSound(SOUND_GOT_GOODIE);
 }
 
@@ -291,6 +312,10 @@ void Character::getHit(int points)
 	m_hitPoints = m_hitPoints - points;
 	if (m_hitPoints <= 0)
 	{
+		if (canStealGoodies())
+		{
+ 			dropGoodies();
+		}
 		kill();
 	}
 }
@@ -305,7 +330,7 @@ bool Character::shouldShoot()
 	shared_ptr<Player> player = sw->getPlayer();
 	double playerX = player->getX();
 	double playerY = player->getY();
-	
+
 
 	bool playerInLine = false;
 	bool obstructionExists = false;
@@ -315,12 +340,12 @@ bool Character::shouldShoot()
 		if (direction == up && playerY > Y)
 		{
 			playerInLine = true;
-			obstructionExists = sw->isPathObstructed(X, Y+1, playerX, playerY-1);
+			obstructionExists = sw->isPathObstructed(X, Y + 1, playerX, playerY - 1);
 		}
 		else if (direction == down && playerY < Y)
 		{
 			playerInLine = true;
-			obstructionExists = sw->isPathObstructed(playerX, playerY+1, X, Y-1);
+			obstructionExists = sw->isPathObstructed(playerX, playerY + 1, X, Y - 1);
 		}
 	}
 	// Same Row
@@ -329,18 +354,18 @@ bool Character::shouldShoot()
 		if (direction == right && playerX > X)
 		{
 			playerInLine = true;
-			obstructionExists = sw->isPathObstructed(X+1, Y, playerX-1, playerY);
+			obstructionExists = sw->isPathObstructed(X + 1, Y, playerX - 1, playerY);
 		}
 		else if (direction == left && playerX < X)
 		{
 			playerInLine = true;
-			obstructionExists = sw->isPathObstructed(playerX+1, playerY, X-1, Y);
+			obstructionExists = sw->isPathObstructed(playerX + 1, playerY, X - 1, Y);
 		}
 	}
 
 	return (playerInLine && !obstructionExists);
 }
-		
+
 
 bool Character::move(int direction)
 {
@@ -354,7 +379,7 @@ bool Character::move(int direction)
 		moveTo(updatedPos.first, updatedPos.second);
 		return true;
 	}
-	else if(isPlayer())
+	else if (isPlayer())
 	{
 		vector<shared_ptr<Actor>> actors = sw->getActorsAt(updatedPos.first, updatedPos.second);
 		for (auto actor : actors)
@@ -381,7 +406,7 @@ bool Character::move(int direction)
 
 	}
 	return false;
-	
+
 }
 
 void Character::shoot(int direction)
@@ -402,7 +427,7 @@ void Character::shoot(int direction)
 				return;
 			}
 		}
-		getStudentWorld()->addPea(updatedPos.first, updatedPos.second, direction);
+		getStudentWorld()->addPea(make_shared<Pea>(sw, updatedPos.first, updatedPos.second, direction));
 		if (isPlayer())
 			sw->playSound(SOUND_PLAYER_FIRE);
 		else
@@ -415,29 +440,10 @@ RageBot::RageBot(StudentWorld* sw, double x, double y, int startDirection)
 	: Character(sw, IID_RAGEBOT, x, y, startDirection, 10, 100)
 {
 	setVisible(true);
-	switch (startDirection)
-	{
-	case (GraphObject::right):
-	{
-		m_path = horizontal;
-		break;
-	}
-	case (GraphObject::down):
-	{
-		m_path = vertical;
-		break;
-	}
-	default:
-	{
-		throw std::runtime_error("Wrong Direction for RageBot");
-		break;
-	}
-	}
 	//Setting Rest Time
-	int ticks = (28 - sw->getLevel()) / 4; 
+	int ticks = (28 - sw->getLevel()) / 4;
 	if (ticks < 3)
-		ticks = 3; 
-	cout << ticks << endl;
+		ticks = 3;
 	m_maxRestTime = ticks;
 	m_restTime = ticks;
 }
@@ -466,6 +472,93 @@ void RageBot::doSomething()
 		}
 
 	}
+}
+
+ThiefBot::ThiefBot(StudentWorld* sw, int imageID, double x, double y, botType type)
+	:Character(sw, imageID, x, y, GraphObject::right, 
+		(type == botType::mean) ? 8 : 5, 
+		(type == botType::mean) ? 20 : 10), m_type(type), m_goodie(nullptr)
+{
+	setVisible(true);
+	//Setting Rest Time
+	int ticks = (28 - sw->getLevel()) / 4;
+	if (ticks < 3)
+		ticks = 3;
+	cout << ticks << endl;
+	m_maxRestTime = ticks;
+	m_restTime = ticks;
+	m_distanceBeforeTurning = randInt(1, 6);
+}
+
+void ThiefBot::doSomething()
+{
+	int direction = getDirection();
+	if (m_restTime > 0)
+	{
+		m_restTime--;
+		return;
+	}
+	else
+	{
+		m_restTime = m_maxRestTime;
+		double x = getX();
+		double y = getY();
+		StudentWorld* sw = getStudentWorld();
+		vector<shared_ptr<Actor>> actors = sw->getActorsAt(x, y);
+		if (!actors.empty())
+		{
+			for (auto actor : actors)
+			{
+				//if (actor->isPickable() && m_goodie == nullptr && randInt(1, 10) == 1) TODO
+				if (m_goodie == nullptr)
+				{
+					shared_ptr<Goodie> goodie = dynamic_pointer_cast<Goodie> (actor);
+					if (goodie)
+					{
+						goodie->getStolen();
+						m_goodie = goodie;
+						return;
+					}
+				}
+			}
+		}
+		
+		if (m_distanceBeforeTurning > 0 && move(direction))
+		{
+			m_distanceBeforeTurning--;
+			return;
+		}
+		else
+		{
+			m_distanceBeforeTurning = randInt(1, 6);
+			int randomDirection = randInt(0, 3) * 90;
+			for (int i = 0; i < 4; i++)
+			{
+				randomDirection = randomDirection + (i*90);
+				setDirection(randomDirection);
+				if (move(direction))
+					return;
+			}
+		}
+	}
+	
+
+}
+
+void ThiefBot::dropGoodies()
+{
+	if (m_goodie)
+	{
+		getStudentWorld()->addGoodie(m_goodie);
+		m_goodie->revive(getX(),getY());
+	}
+}
+
+
+
+std::shared_ptr<Goodie> ThiefBot::getGoodie()
+{
+	return m_goodie;
 }
 
 Player::Player(StudentWorld* sw, double x, double y)
@@ -542,4 +635,53 @@ void Player::cheat()
 {
 	//TODO: Cheat
 }
+
+ThiefBotFactory::ThiefBotFactory(StudentWorld* sw, double x, double y, factorytype type)
+	:Actor(sw, IID_ROBOT_FACTORY, x, y), m_factoryType(type)
+{
+	setVisible(true);
+}
+
+void ThiefBotFactory::doSomething()
+{
+	StudentWorld* sw = getStudentWorld();
+	double currentX = getX();
+	double currentY = getY();
+	int count = 0;
+	for (double x = currentX - 3; x < currentX + 3; x++)
+	{
+		for (double y = currentY - 3; y < currentY + 3; y++)
+		{
+			if (sw->isWithinBounds(x, y))
+			{
+				vector <shared_ptr<Actor>> actors = sw->getActorsAt(x, y);
+				if (!actors.empty())
+				{
+					for (auto actor : actors)
+					{
+						if (dynamic_pointer_cast<ThiefBot>(actor))
+						{
+							count++;
+						}
+					}
+				}
+			}
+		}
+	}
+	if (count < 1)
+	{
+		// 1 in 50 chance
+		if (m_factoryType == regular && (randInt(1, 50) == 1))
+		{
+			shared_ptr<ThiefBot> bot = make_shared<ThiefBot>(sw, IID_THIEFBOT, currentX, currentY, ThiefBot::botType::regular);
+			sw->addThiefBot(bot);
+		}
+		else if (m_factoryType == mean && (randInt(1, 50) == 1))
+		{
+			shared_ptr<ThiefBot> bot = make_shared<ThiefBot>(sw, IID_MEAN_THIEFBOT, currentX, currentY, ThiefBot::botType::mean);
+			sw->addThiefBot(bot);
+		}
+	}
+}
+
 
